@@ -1,4 +1,4 @@
-/*********************************************************************************
+﻿/*********************************************************************************
 Copyright (C) 2014 Adrian Jarabo (ajarabo@unizar.es)
 Copyright (C) 2014 Diego Gutierrez (diegog@unizar.es)
 All rights reserved.
@@ -134,6 +134,61 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 //---------------------------------------------------------------------
 void PhotonMapping::preprocess()
 {
+	list<Photon> *global_photons = new list<Photon>();
+	list<Photon> *caustic_photons = new list<Photon>();
+
+	Ray *rayo;
+	Vector3 intensidad;
+	Vector3 direccion(0, 0, 0);
+
+	vector<LightSource*> luces = world->light_source_list;
+	for (int i = 0; i < luces.size(); i++) {
+		LightSource *luz = luces[i];
+		intensidad = Vector3(luz->get_intensities().operator/(m_max_nb_shots / 3.5));
+
+		/*
+		2 - Trace the photon through the scene storing the inter-
+			sections between the photons and matter. You can use
+			the function 'trace_ray' for this purpose.
+		*/
+		do {
+			/*
+			1 - Sample a world's light source in the scene to create
+				the initial direct photon from the light source.
+			*/
+			Real x, y, z;
+			do {
+				x = -1 + static_cast <Real> (rand()) / (static_cast <Real> (RAND_MAX / 2));
+				y = -1 + static_cast <Real> (rand()) / (static_cast <Real> (RAND_MAX / 2));
+				z = -1 + static_cast <Real> (rand()) / (static_cast <Real> (RAND_MAX / 2));
+			} while (x * x + y * y + z * z > 1);
+
+			direccion = Vector3(x, y, z);
+			rayo = new Ray(luz->get_position(), direccion.normalize(), 0);
+		} while (trace_ray(*rayo, intensidad, *global_photons, *caustic_photons, false));
+
+		/*
+		3 - Finally, once all the photons have been shot, you'll
+			need to build the photon maps, that will be used later
+			for rendering.
+		*/
+		for (int j = 0; j < global_photons->size(); j++) {
+			Photon photon = global_photons->front();
+			global_photons->pop_front();
+			m_global_map.store(vector<Real>(photon.position.data, photon.position.data + 3), photon);
+		}
+
+		for (int j = 0; j < caustic_photons->size(); j++) {
+			Photon photon = caustic_photons->front();
+			caustic_photons->pop_front();
+			m_caustics_map.store(vector<Real>(photon.position.data, photon.position.data + 3), photon);
+		}
+	}
+	
+	if (global_photons->size() > 0)
+		m_global_map.balance();
+	if (caustic_photons->size() > 0)
+		m_caustics_map.balance();
 }
 
 //*********************************************************************
