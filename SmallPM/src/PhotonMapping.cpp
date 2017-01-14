@@ -11,6 +11,10 @@ students.
 This software is provided as is, and any express or implied warranties are disclaimed.
 In no event shall copyright holders be liable for any damage.
 **********************************************************************************/
+
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include "PhotonMapping.h"
 #include "World.h"
 #include "Intersection.h"
@@ -144,7 +148,7 @@ void PhotonMapping::preprocess()
 	vector<LightSource*> luces = world->light_source_list;
 	for (int i = 0; i < luces.size(); i++) {
 		LightSource *luz = luces[i];
-		intensidad = Vector3(luz->get_intensities().operator/(m_max_nb_shots / 3.5));
+		intensidad = Vector3(luz->get_intensities() / (m_max_nb_shots / 3.5));
 
 		/*
 		2 - Trace the photon through the scene storing the inter-
@@ -207,6 +211,64 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	Vector3 L(0);
 	Intersection it(it0);
 
+	/*
+	* Luz directa
+	*/
+
+	Vector3 albedo = it.intersected()->material()->get_albedo(it);
+
+	/*
+	* Luz indirecta
+	*/
+
+	vector<const KDTree<Photon, 3>::Node*> global_photons;
+	vector<const KDTree<Photon, 3>::Node*> caustic_photons;
+
+	Real maxDistanciaGlobal;
+	Real maxDistanciaCaustica;
+
+	// Buscar los fotones globales más cercanos
+	m_global_map.find(vector<Real>(it.get_position().data, it.get_position().data + 3), m_nb_photons, global_photons, maxDistanciaGlobal);
+
+	// Buscar los fotones causticos más cercanos
+	m_caustics_map.find(vector<Real>(it.get_position().data, it.get_position().data + 3), m_nb_photons, caustic_photons, maxDistanciaCaustica);
+
+	// Cono
+	Real k = 1.3;
+	Real areaConoGlobal = 1 / ((1 - (2 / (3 * k))) * M_PI * maxDistanciaGlobal * maxDistanciaGlobal);
+	Real areaConoCaustica = 1 /  ((1 - (2 / (3 * k))) * M_PI * maxDistanciaCaustica * maxDistanciaCaustica);
+
+	Vector3 acumuladodGlobal = Vector3(0, 0, 0);
+	Vector3 acumuladodCaustica = Vector3(0, 0, 0);
+
+	// Estimación de radiancia con el mapa de fotones global
+	for (int i = 0; i < global_photons.size(); i++) {
+		const KDTree<Photon, 3>::Node* nodo = global_photons.at(i);
+		Photon foton = nodo->data();
+
+		Real distancia = (foton.position - it.get_position()).length();
+		Real wpc = 1 - (distancia / k * maxDistanciaGlobal);
+		acumuladodGlobal += albedo * foton.flux * wpc;
+	}
+
+	acumuladodGlobal *= areaConoGlobal;
+	L += acumuladodGlobal;
+	
+	// Estimación de radiancia con el mapa de fotones caustico
+	for (int i = 0; i < caustic_photons.size(); i++) {
+		const KDTree<Photon, 3>::Node* nodo = caustic_photons.at(i);
+		Photon foton = nodo->data();
+
+		Real distancia = (foton.position - it.get_position()).length();
+		Real wpc = 1 - (distancia / k * maxDistanciaCaustica);
+		acumuladodCaustica += albedo * foton.flux * wpc;
+	}
+
+	acumuladodCaustica *= areaConoCaustica;
+	L += acumuladodCaustica;
+
+	return L;
+
 	//**********************************************************************
 	// The following piece of code is included here for two reasons: first
 	// it works as a 'hello world' code to check that everthing compiles 
@@ -214,7 +276,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// will need when doing the work. Goes without saying: remove the 
 	// pieces of code that you won't be using.
 	//
-	unsigned int debug_mode = 1;
+	/*unsigned int debug_mode = 1;
 
 	switch (debug_mode)
 	{
@@ -256,5 +318,5 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	// End of exampled code
 	//**********************************************************************
 
-	return L;
+	return L;*/
 }
