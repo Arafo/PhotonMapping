@@ -215,7 +215,18 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	* Luz directa
 	*/
 
+	Vector3 ambiental = World->get_ambient();
 	Vector3 albedo = it.intersected()->material()->get_albedo(it);
+	Vector3 reflexivaRefractada;
+	if (it.intersected()->material()->is_delta()){
+		Ray newRay = it.intersected()->material()->get_outgoing_sample_ray(it);
+		Intersection it2 = World->first_intersection(newRay);
+		reflexivaRefractada = shade(it2);
+	}
+
+	Vector3 luzDirecta = ambiental + albedo + reflexivaRefractada;
+
+	L += luzDirecta;
 
 	/*
 	* Luz indirecta
