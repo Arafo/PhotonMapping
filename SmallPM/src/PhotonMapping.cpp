@@ -214,17 +214,21 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	/*
 	* Luz directa
 	*/
-
-	Vector3 ambiental = World->get_ambient();
+	Vector3 ambiental = world->get_ambient();
 	Vector3 albedo = it.intersected()->material()->get_albedo(it);
+	/*difusa = (intensidad luz incidente * coeficiente difuso material)dotproduct(normal*rayo)*/
+	Vector3 difusa = (it.get_ray().get_level() * 0.67) * (it.get_normal()*it.get_ray().get_direction());
 	Vector3 reflexivaRefractada;
 	if (it.intersected()->material()->is_delta()){
-		Ray newRay = it.intersected()->material()->get_outgoing_sample_ray(it);
-		Intersection it2 = World->first_intersection(newRay);
+		Ray newRay;
+		Real pdf;
+		it.intersected()->material()->get_outgoing_sample_ray(it, newRay, pdf);
+		Intersection it2;
+		world->first_intersection(newRay, it2);
 		reflexivaRefractada = shade(it2);
 	}
 
-	Vector3 luzDirecta = ambiental + albedo + reflexivaRefractada;
+	Vector3 luzDirecta = ambiental + difusa + albedo + reflexivaRefractada;
 
 	L += luzDirecta;
 
@@ -232,6 +236,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	* Luz indirecta
 	*/
 
+	
 	vector<const KDTree<Photon, 3>::Node*> global_photons;
 	vector<const KDTree<Photon, 3>::Node*> caustic_photons;
 
@@ -277,7 +282,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 	acumuladodCaustica *= areaConoCaustica;
 	L += acumuladodCaustica;
-
+	
 	return L;
 
 	//**********************************************************************
