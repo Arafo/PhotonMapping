@@ -63,6 +63,9 @@ bool PhotonMapping::trace_ray(const Ray& r, const Vector3 &p,
 		if( !it.did_hit() )
 			break;
 
+		//if (photon_ray.get_level() > 0 && direct)
+			//break;
+
 		//Check if has hit a delta material...
 		if( it.intersected()->material()->is_delta() )
 		{
@@ -169,6 +172,7 @@ void PhotonMapping::preprocess()
 
 			direccion = Vector3(x, y, z);
 			rayo = new Ray(luz->get_position(), direccion.normalize(), 0);
+			//trace_ray(*rayo, intensidad, *global_photons, *caustic_photons, true);
 		} while (trace_ray(*rayo, intensidad, *global_photons, *caustic_photons, false));
 
 		/*
@@ -245,14 +249,17 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 			}
 
 			// Termino especular
+			Real n = it.intersected()->material()->get_specular(it);
 
-			// 2N(N escalar L) - L
-			Vector3 aux = it.get_normal() * 2 * lambert;
-			Vector3 LR = aux - direccionLuz;
-			Real producto = direccionRayo.dot(LR);
-			if (producto > 0) {
-				Real especular = pow(producto, brillo);
-				L += especular  * intensidadLuz * albedo;
+			if (n > 0) {
+				// 2N(N escalar L) - L
+				Vector3 aux = it.get_normal() * 2 * lambert;
+				Vector3 LR = aux - direccionLuz;
+				Real producto = direccionRayo.dot(LR);
+				if (producto > 0) {
+ 					Real especular = pow(producto, n);
+					L += especular  * intensidadLuz * albedo;
+				}
 			}
 		}
 	}
@@ -281,6 +288,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	* Luz indirecta
 	*/
 
+	if (!it.intersected()->material()->is_delta()) {
 	vector<const KDTree<Photon, 3>::Node*> global_photons;
 	vector<const KDTree<Photon, 3>::Node*> caustic_photons;
 
@@ -294,7 +302,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	m_caustics_map.find(vector<Real>(it.get_position().data, it.get_position().data + 3), m_nb_photons, caustic_photons, maxDistanciaCaustica);
 
 	// Cono
-	Real k = 1.3f;
+	Real k = 1.0f;
 	Real areaConoGlobal = 1 / ((1 - (2 / (3 * k))) * M_PI * maxDistanciaGlobal * maxDistanciaGlobal);
 	Real areaConoCaustica = 1 /  ((1 - (2 / (3 * k))) * M_PI * maxDistanciaCaustica * maxDistanciaCaustica);
 
@@ -326,6 +334,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 	acumuladodCaustica *= areaConoCaustica;
 	L += acumuladodCaustica;
+	}
 
 	return L;
 

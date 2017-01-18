@@ -27,6 +27,7 @@ In no event shall copyright holders be liable for any damage.
 #include "Lambertian.h"
 #include "Specular.h"
 #include "Transmissive.h"
+#include "Phong.h"
 
 using namespace std;
 
@@ -48,7 +49,7 @@ int main(int argc, char* argv[])
 	char *name_file = NULL, *default_name_file = "name_file";
 	name_file = default_name_file;
 
-	unsigned int scene = 4;
+	unsigned int scene = 0;
 
 	unsigned int photons_global = 10000, 
 				 photons_caustic = 10000, 
@@ -98,6 +99,8 @@ int main(int argc, char* argv[])
 	BSDF* white = new Lambertian(w, Vector3(.85,.85,.85));
 	BSDF* red = new Lambertian(w, Vector3(.85,.085,.085));
 	BSDF* green = new Lambertian(w, Vector3(.085,.85,.085));
+	BSDF* greenPhong = new Phong(w, Vector3(.085, .85, .085), 4);
+	BSDF* redPhong = new Phong(w, Vector3(.85, .085, .085), 40);
 
 	Triangle* floor1 = new Triangle( Vector3(-1.5,0,1.5),Vector3(1.5,0.,1.5),
 									 Vector3(-1.5,0.,-1.5), white);
@@ -175,6 +178,30 @@ int main(int argc, char* argv[])
 
 		Object3D* sphere2 = new Sphere(Vector3(0, 0.6, 0), 0.6, glass);
 		w->add_object(sphere2);
+	}
+	break;
+	case 5:
+	{
+		Object3D* sphere1 = new Sphere(Vector3(-0.5, 0.4, 0), 0.4, redPhong);
+		w->add_object(sphere1);
+
+		Object3D* sphere2 = new Sphere(Vector3(0.5, 0.4, 0), 0.4, greenPhong);
+		w->add_object(sphere2);
+	}
+	break;
+	case 6:
+	{
+		Object3D* sphere1 = new Sphere(Vector3(-0.5, 0.5, .5), 0.3, mirror);
+		w->add_object(sphere1);
+
+		Object3D* sphere2 = new Sphere(Vector3(0.5, 0.3, .5), 0.3, glass);
+		w->add_object(sphere2);
+
+		Object3D* sphere3 = new Sphere(Vector3(-0.5, 1.0, -0.5), 0.3, red);
+		w->add_object(sphere3);
+
+		Object3D* sphere4 = new Sphere(Vector3(0.5, 1.0, -0.5), 0.3, greenPhong);
+		w->add_object(sphere4);
 	}
 	break;
 	default:
