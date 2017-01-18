@@ -148,7 +148,7 @@ void PhotonMapping::preprocess()
 	vector<LightSource*> luces = world->light_source_list;
 	for (int i = 0; i < luces.size(); i++) {
 		LightSource *luz = luces[i];
-		intensidad = Vector3(luz->get_intensities() / (m_max_nb_shots / 3.5));
+		intensidad = Vector3(luz->get_intensities() / (m_max_nb_shots /*/ 3.5*/));
 
 		/*
 		2 - Trace the photon through the scene storing the inter-
@@ -214,29 +214,73 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	/*
 	* Luz directa
 	*/
-	Vector3 ambiental = world->get_ambient();
+
 	Vector3 albedo = it.intersected()->material()->get_albedo(it);
-	/*difusa = (intensidad luz incidente * coeficiente difuso material)dotproduct(normal*rayo)*/
-	Vector3 difusa = (it.get_ray().get_level() * 0.67) * (it.get_normal()*it.get_ray().get_direction());
-	Vector3 reflexivaRefractada;
-	if (it.intersected()->material()->is_delta()){
-		Ray newRay;
-		Real pdf;
-		it.intersected()->material()->get_outgoing_sample_ray(it, newRay, pdf);
-		Intersection it2;
-		world->first_intersection(newRay, it2);
-		reflexivaRefractada = shade(it2);
+	Vector3 ambiental = world->get_ambient();
+	int brillo = 8;
+
+	for (LightSource* luz : world->light_source_list) {
+		// Termino ambiental
+		L += albedo * ambiental;
+
+		// Intensidad luz
+		Vector3 intensidadLuz = luz->get_intensities();
+
+		// Direccion rayo desde luz
+		Vector3 direccionLuzAux = luz->get_incoming_direction(it.get_position());	  
+		Vector3 direccionLuz = direccionLuzAux * -1;
+
+		// Direccion rayo del punto al ojo
+		Vector3 direccionRayoAux = it.get_ray().get_direction();  
+		// Direccion rayo del punto al ojo corregido
+		Vector3 direccionRayo = direccionRayoAux * -1;
+
+		if (luz->is_visible(it.get_position()) && !it.intersected()->material()->is_delta()) {
+			Real lambert = 0;
+			
+			// Termino difuso
+			lambert = it.get_normal().dot(direccionLuz);
+			if (lambert > 0) {
+				L += lambert * intensidadLuz * albedo;
+			}
+
+			// Termino especular
+
+			// 2N(N escalar L) - L
+			Vector3 aux = it.get_normal() * 2 * lambert;
+			Vector3 LR = aux - direccionLuz;
+			Real producto = direccionRayo.dot(LR);
+			if (producto > 0) {
+				Real especular = pow(producto, brillo);
+				L += especular  * intensidadLuz * albedo;
+			}
+		}
 	}
 
-	Vector3 luzDirecta = ambiental + difusa + albedo + reflexivaRefractada;
+	if (it.intersected()->material()->is_delta()) {
+		Ray rayo;
+		Real ignore(0);
+		Intersection itdelta;
+		it.intersected()->material()->get_outgoing_sample_ray(it, rayo, ignore);
+		rayo.shift();
+		world->first_intersection(rayo, itdelta);
+		int i = 0;
+		while (itdelta.did_hit() && itdelta.intersected()->material()->is_delta() && i < 5) {
+			itdelta.intersected()->material()->get_outgoing_sample_ray(itdelta, rayo, ignore);
+			world->first_intersection(rayo, itdelta);
+			i++;
+		}
 
-	L += luzDirecta;
+		if (itdelta.did_hit() && i < 5) {
+			Vector3 color = shade(itdelta);
+			L += color;
+		}
+	}
 
 	/*
 	* Luz indirecta
 	*/
 
-	
 	vector<const KDTree<Photon, 3>::Node*> global_photons;
 	vector<const KDTree<Photon, 3>::Node*> caustic_photons;
 
@@ -250,12 +294,12 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 	m_caustics_map.find(vector<Real>(it.get_position().data, it.get_position().data + 3), m_nb_photons, caustic_photons, maxDistanciaCaustica);
 
 	// Cono
-	Real k = 1.3;
+	Real k = 1.3f;
 	Real areaConoGlobal = 1 / ((1 - (2 / (3 * k))) * M_PI * maxDistanciaGlobal * maxDistanciaGlobal);
 	Real areaConoCaustica = 1 /  ((1 - (2 / (3 * k))) * M_PI * maxDistanciaCaustica * maxDistanciaCaustica);
 
-	Vector3 acumuladodGlobal = Vector3(0, 0, 0);
-	Vector3 acumuladodCaustica = Vector3(0, 0, 0);
+	Vector3 acumuladodGlobal(0, 0, 0);
+	Vector3 acumuladodCaustica(0, 0, 0);
 
 	// Estimación de radiancia con el mapa de fotones global
 	for (int i = 0; i < global_photons.size(); i++) {
@@ -282,7 +326,7 @@ Vector3 PhotonMapping::shade(Intersection &it0)const
 
 	acumuladodCaustica *= areaConoCaustica;
 	L += acumuladodCaustica;
-	
+
 	return L;
 
 	//**********************************************************************

@@ -48,12 +48,12 @@ int main(int argc, char* argv[])
 	char *name_file = NULL, *default_name_file = "name_file";
 	name_file = default_name_file;
 
-	unsigned int scene = 0;
+	unsigned int scene = 4;
 
 	unsigned int photons_global = 10000, 
 				 photons_caustic = 10000, 
-				 max_shots = 100000, 
-				 nb_nearest_photons = 10;
+				 max_shots = 10000, 
+				 nb_nearest_photons = 50;
 
 	// ---------------------------------------------------------------------
 	// Parse input
@@ -166,6 +166,15 @@ int main(int argc, char* argv[])
 
 		Mesh* bunny = new Mesh("data\\bunny.obj", mirror);
 		w->add_object(bunny);
+	}
+	break;
+	case 4:
+	{
+		Object3D* sphere1 = new Sphere(Vector3(0, 0.6, 0), 0.3, red);
+		w->add_object(sphere1);
+
+		Object3D* sphere2 = new Sphere(Vector3(0, 0.6, 0), 0.6, glass);
+		w->add_object(sphere2);
 	}
 	break;
 	default:
